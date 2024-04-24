@@ -6,16 +6,22 @@ import com.pablo.gestioncursos.gestionCursos.reports.CursoExporterPDF;
 import com.pablo.gestioncursos.gestionCursos.repository.CursoRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -31,11 +37,44 @@ public class CursoController {
 
 
     @GetMapping("/cursos")
-    public String listarCursos(Model model) {
-        List<Curso> cursos = cursoRepository.findAll();
-        model.addAttribute("cursos", cursos);
-        return "cursos";
+    public String listarCursos(Model model, @Param("keyword") String keyword, @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "3") int size) {
+        try{
+            // Inicializa una lista de cursos
+            List<Curso> cursos = new ArrayList<>();
 
+            // Configura la paginación
+            Pageable paging = PageRequest.of(page-1,size);
+
+            // Inicializa una página de cursos
+            Page<Curso> pageCursos = null;
+
+            // Verifica si se proporcionó una palabra clave (keyword) para buscar cursos
+            if(keyword == null){
+                // Si no hay palabra clave, busca todos los cursos paginados
+                pageCursos = cursoRepository.findAll(paging);
+            } else {
+                // Si se proporcionó una palabra clave, busca los cursos que contengan esa palabra clave en el título
+                pageCursos = cursoRepository.findByTituloContainingIgnoreCase(keyword, paging);
+                // Añade la palabra clave al modelo para mostrarla en la vista
+                model.addAttribute("keyword", keyword);
+            }
+
+            // Obtiene la lista de cursos de la página actual
+            cursos = pageCursos.getContent();
+
+            // Añade los atributos necesarios al modelo para su visualización en la vista
+            model.addAttribute("cursos", cursos); // Lista de cursos
+            model.addAttribute("currentPage", pageCursos.getNumber() + 1); // Página actual
+            model.addAttribute("totalItems", pageCursos.getTotalElements()); // Total de elementos
+            model.addAttribute("totalPages", pageCursos.getTotalPages()); // Total de páginas
+            model.addAttribute("pageSize", size); // Tamaño de la página
+        } catch (Exception e) {
+            // Si ocurre algún error, añade un mensaje de error al modelo
+            model.addAttribute("message", e.getMessage());
+        }
+
+        // Devuelve el nombre de la vista a la que se redirigirá
+        return "cursos";
     }
 
     @GetMapping("/cursos/nuevo")
